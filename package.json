@@ -1,0 +1,29 @@
+{
+  "name": "rigid-pack-3d",
+  "version": "1.0.0",
+  "description": "Zero-dependency Three.js viewer for a rigid, tear-open pack, with parametric SVG / DXF drawings and OpenSCAD parts.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "pack:template": "node scripts/gen-pack-template.mjs",
+    "pack:parts": "node scripts/gen-pack-parts.mjs",
+    "pack:cad": "node scripts/gen-pack-cad.mjs",
+    "pack:all": "node scripts/gen-pack-template.mjs && node scripts/gen-pack-parts.mjs && node scripts/gen-pack-cad.mjs"
+  },
+  "keywords": [
+    "threejs",
+    "webgl",
+    "packaging-design",
+    "structural-packaging",
+    "interaction-design",
+    "parametric-design",
+    "svg",
+    "dxf",
+    "openscad",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

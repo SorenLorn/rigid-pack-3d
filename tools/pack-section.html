@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEAM-382 · 结构剖面演示</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151d; --line:#232838; --ink:#e8ecf4; --dim:#8b95ab;
+    --gold:#d8bd74; --cork:#e6d3b3; --cut:#ff5c5c; --blue:#6aa8ff; --green:#49d18a;
+    --mono:"Berkeley Mono","JetBrains Mono","SFMono-Regular",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:radial-gradient(120% 90% at 50% 0%,#151a26 0%,var(--bg) 60%);
+    color:var(--ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    display:grid; grid-template-rows:auto 1fr auto; overflow:hidden;
+  }
+  header{display:flex;align-items:center;gap:18px;padding:14px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{margin:0;font-size:15px;letter-spacing:.12em;font-weight:700}
+  header h1 span{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12px;letter-spacing:.06em}
+  .params{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+  .params label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);letter-spacing:.08em}
+  .params input{
+    width:64px;background:#0a0c11;border:1px solid var(--line);color:var(--ink);
+    border-radius:6px;padding:5px 7px;font:12px var(--mono);
+  }
+  .params input:focus{outline:none;border-color:var(--blue)}
+
+  main{position:relative;display:grid;place-items:center;padding:10px 22px;min-height:0}
+  #stage{width:100%;height:100%;display:grid;place-items:center}
+  #stage svg{max-width:100%;max-height:100%;display:block}
+
+  #info{
+    position:absolute;right:26px;top:18px;width:250px;background:rgba(18,21,29,.94);
+    border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;
+    opacity:0;transform:translateY(-6px);transition:.18s;pointer-events:none;backdrop-filter:blur(8px);
+  }
+  #info.on{opacity:1;transform:none}
+  #info b{display:block;font-size:13px;margin-bottom:4px;letter-spacing:.06em}
+  #info i{font-style:normal;color:var(--dim);font-family:var(--mono);font-size:11px;line-height:1.7}
+
+  footer{border-top:1px solid var(--line);padding:12px 22px 16px;display:grid;grid-template-columns:1fr auto;gap:10px 24px}
+  .scrub{display:flex;align-items:center;gap:14px}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;height:4px;border-radius:2px;flex:1;
+    background:linear-gradient(90deg,var(--gold) 0%,var(--gold) var(--p,0%),#242a38 var(--p,0%),#242a38 100%);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;
+    border:3px solid var(--gold);cursor:grab;box-shadow:0 0 14px rgba(216,189,116,.5);
+  }
+  .steps{display:flex;gap:6px;font-size:11px;color:var(--dim)}
+  .steps button{
+    background:#141822;border:1px solid var(--line);color:var(--dim);border-radius:999px;
+    padding:4px 11px;cursor:pointer;font:11px inherit;letter-spacing:.06em;transition:.15s;
+  }
+  .steps button:hover{border-color:var(--gold);color:var(--gold)}
+  .steps button.on{background:rgba(216,189,116,.14);border-color:var(--gold);color:var(--gold)}
+  .readout{display:flex;gap:18px;font-family:var(--mono);font-size:11px;color:var(--dim);flex-wrap:wrap;justify-content:flex-end}
+  .readout b{color:var(--ink);font-weight:500}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--dim);margin-top:4px}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SEAM-382 <span>·</span> 结构剖面</h1>
+  <span class="sub">拖下方滑块 · 悬停部件看尺寸</span>
+  <div class="params">
+    <label>外径<input id="p-od" type="number" step="0.1" value="35"></label>
+    <label>壁厚<input id="p-wall" type="number" step="0.05" value="1.1"></label>
+    <label>总长<input id="p-len" type="number" step="1" value="382"></label>
+    <label>环带<input id="p-band" type="number" step="1" value="99"></label>
+  </div>
+</header>
+
+<main>
+  <div id="stage"></div>
+  <div id="info"></div>
+</main>
+
+<footer>
+  <div class="scrub">
+    <div class="steps" id="steps">
+      <button data-t="0">① 密封</button>
+      <button data-t="0.3">② 撕带</button>
+      <button data-t="0.5">③ 拔盖</button>
+      <button data-t="0.72">④ 取烟</button>
+      <button data-t="1">⑤ 弹匣</button>
+    </div>
+    <input id="scrub" type="range" min="0" max="1000" value="0">
+  </div>
+  <div class="readout" id="readout"></div>
+</footer>
+
+<script>
+/* ---------- 参数（与 scripts/pack-params.mjs 同一套推导） ---------- */
+const S = {
+  od: 35, wall: 1.10, len: 382, band: 99, bandw: 14,
+  stick: 85, gap: 2, cell: 8.10, web: 0.50, cartWall: 0.60, tolTube: 0.30,
+  holes: 7, preset: 20
+};
+
+function derive(){
+  const P = {...S};
+  P.id = +(P.od - 2*P.wall).toFixed(2);
+  P.idMin = +(P.id - P.tolTube).toFixed(2);
+  P.idMax = +(P.id + P.tolTube).toFixed(2);
+  P.cartOD = +(P.idMin - 0.30).toFixed(2);
+  P.cartID = +(P.cartOD - 2*P.cartWall).toFixed(2);
+  P.plateOD = +(P.cartID - 0.20).toFixed(2);
+  P.ringR = +(P.cell + P.web).toFixed(2);
+  P.ring = +(P.stick + P.gap).toFixed(1);
+  P.layers = Math.floor((P.len - P.band - P.bandw - 8) / P.ring + 1e-6);
+  P.mag = +(P.ring * P.layers).toFixed(1);
+  P.bore = +(P.cell + 0.4).toFixed(2);
+  P.gapMax = +((P.idMax - P.cartOD)/2).toFixed(2);
+  P.slots = P.holes * P.layers;
+  return P;
+}
+
+let P = derive();
+let t = 0;          // 0..1 总进度
+
+/* ---------- 工具 ---------- */
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const f = (n,d=2)=>Number(n.toFixed(d));
+
+/* ---------- 绘制 ---------- */
+function build(){
+  const KY = 3;                      // 径向放大 3×（否则 0.55mm 壁厚看不见）
+  const X = v => v;
+  const Y = r => -r * KY;            // 上为正
+
+  const peel    = clamp(t/0.35, 0, 1);
+  const lift    = clamp((t-0.36)/0.24, 0, 1);      // 端盖左移
+  const extract = clamp((t-0.58)/0.18, 0, 1);      // 首支抽出
+  const mag     = clamp((t-0.82)/0.18, 0, 1);      // 弹匣拉出
+
+  const L=P.len, R=P.od/2, Ri=P.id/2, Rc=P.cartOD/2, Rci=P.cartID/2;
+  const st = 3.9;
+  const x0 = -122, x1 = L+28, yTop = -66, yBot = 54;
+  const W = x1 - x0, H = yBot - yTop;
+
+  const capShift = -lift * (P.band + 6);
+  const cartShift = -mag * 80;
+
+  const g = [];
+  const add = (...a)=>g.push(...a);
+
+  /* 轴线 */
+  add(`<line x1="${f(X(x0))}" y1="0" x2="${f(X(x1))}" y2="0"
+        stroke="#3a4256" stroke-width=".5" stroke-dasharray="6 3 1 3"/>`);
+
+  /* 本体管壁（113 起） */
+  const bx = P.band + P.bandw;
+  add(`<g data-part="body" data-name="本体（外管）"
+        data-spec="OD ${f(P.od)} · 壁 ${f(P.wall)} · ${f(bx)}–${f(L)}mm">
+      <rect x="${f(X(bx))}" y="${f(Y(R))}" width="${f(X(L-bx))}" height="${f((R-Ri)*KY)}" fill="#1b2030" stroke="#5b6579" stroke-width=".6"/>
+      <rect x="${f(X(bx))}" y="${f(Y(-Ri))}" width="${f(X(L-bx))}" height="${f((R-Ri)*KY)}" fill="#1b2030" stroke="#5b6579" stroke-width=".6"/>
+    </g>`);
+
+  /* 环撕带：随 peel 消失 + 卷曲指示 */
+  /* 环带与端盖必须压在烟支之上，否则烟支会盖住管壁；单独收集后统一追加 */
+  const overlay = (push) => {
+    const bandAlpha = 1 - peel;
+    if (bandAlpha > 0.02 || peel === 0) {
+      push(`<g data-part="band" data-name="环撕带"
+            data-spec="宽 ${f(P.bandw)}mm · 96 段刻线 · 剥开后不可复位"
+            opacity="${f(Math.max(bandAlpha,0),2)}">
+          <rect x="${f(X(P.band))}" y="${f(Y(R))}" width="${f(X(P.bandw))}" height="${f((R-Ri)*KY)}" fill="#d8bd74" fill-opacity=".55" stroke="#d8bd74" stroke-width=".5"/>
+          <rect x="${f(X(P.band))}" y="${f(Y(-Ri))}" width="${f(X(P.bandw))}" height="${f((R-Ri)*KY)}" fill="#d8bd74" fill-opacity=".55" stroke="#d8bd74" stroke-width=".5"/>
+        </g>`);
+    }
+    if (peel > 0.02) {
+      const r = 5 + 6*(1-peel);
+      push(`<g data-part="band" data-name="已剥下的环带"
+            data-spec="热定型 R12 预卷 · 无法回贴">
+          <path d="M${f(X(P.band))} ${f(Y(R))} a ${f(r)} ${f(r)} 0 0 1 ${f(-r*1.4)} ${f(r*1.1)}"
+                fill="none" stroke="#d8bd74" stroke-width="1.2" opacity=".85"/>
+        </g>`);
+    }
+
+    /* 端盖 */
+    push(`<g transform="translate(${f(X(capShift))} 0)" data-part="cap" data-name="滤嘴端盖"
+          data-spec="${f(P.band)}mm · 内藏 Ø10 罩腔 · 卡爪 + 0.15 过盈">`);
+    push(`<rect x="0" y="${f(Y(R))}" width="${f(X(P.band))}" height="${f((R-Ri)*KY)}" fill="#1b2030" stroke="#7f8aa3" stroke-width=".6"/>`);
+    push(`<rect x="0" y="${f(Y(-Ri))}" width="${f(X(P.band))}" height="${f((R-Ri)*KY)}" fill="#1b2030" stroke="#7f8aa3" stroke-width=".6"/>`);
+    push(`<rect x="0" y="${f(Y(R))}" width="${f(X(3))}" height="${f((2*R)*KY)}" fill="#1b2030" stroke="#7f8aa3" stroke-width=".6"/>`);
+    // 罩腔
+    push(`<rect x="${f(X(P.band-25))}" y="${f(Y(5))}" width="${f(X(25))}" height="${f(0.7*KY)}" fill="#2a3244" stroke="#7f8aa3" stroke-width=".4"/>`);
+    push(`<rect x="${f(X(P.band-25))}" y="${f(Y(-4.3))}" width="${f(X(25))}" height="${f(0.7*KY)}" fill="#2a3244" stroke="#7f8aa3" stroke-width=".4"/>`);
+    push(`</g>`);
+  };
+
+  /* 面盘 + 唇环 */
+  add(`<g data-part="face" data-name="单孔面盘 + 硅胶唇环"
+        data-spec="Ø${f(P.plateOD)} · 首发孔 Ø${f(P.bore)} · 唇环 Ø10.5/Ø7.6 过盈 0.2">
+      <rect x="${f(X(bx))}" y="${f(Y(Ri))}" width="${f(X(1))}" height="${f((Ri-4.2)*KY)}" fill="#3a2f3f" stroke="#c98fd8" stroke-width=".6"/>
+      <rect x="${f(X(bx))}" y="${f(Y(-4.2))}" width="${f(X(1))}" height="${f((Ri-4.2)*KY)}" fill="#3a2f3f" stroke="#c98fd8" stroke-width=".6"/>
+      <rect x="${f(X(bx))}" y="${f(Y(4.25))}" width="${f(X(1.6))}" height="${f(1.3*KY)}" fill="#c98fd8" stroke="#c98fd8" stroke-width=".3"/>
+      <rect x="${f(X(bx))}" y="${f(Y(-2.95))}" width="${f(X(1.6))}" height="${f(1.3*KY)}" fill="#c98fd8" stroke="#c98fd8" stroke-width=".3"/>
+    </g>`);
+
+  /* 内胆 + 蜂窝 */
+  add(`<g transform="translate(${f(X(cartShift))} 0)" data-part="cart" data-name="内胆（弹匣）"
+        data-spec="Ø${f(P.cartOD)} / 内径 Ø${f(P.cartID)} · ${f(P.mag)}mm · ${P.layers} 层">`);
+  add(`<rect x="${f(X(bx))}" y="${f(Y(Rc))}" width="${f(X(P.mag))}" height="${f(P.cartWall*KY)}" fill="#1d2536" stroke="#6f7f9e" stroke-width=".5"/>`);
+  add(`<rect x="${f(X(bx))}" y="${f(Y(-Rci))}" width="${f(X(P.mag))}" height="${f(P.cartWall*KY)}" fill="#1d2536" stroke="#6f7f9e" stroke-width=".5"/>`);
+  for (let i=1;i<=P.layers;i++){
+    const gx = X(bx + i*P.ring - 0.8);
+    add(`<line x1="${f(gx)}" y1="${f(Y(Rci))}" x2="${f(gx)}" y2="${f(Y(-Rci))}" stroke="#6f7f9e" stroke-width="1.1"/>`);
+  }
+  add(`</g>`);
+
+  /* 烟支：3 通道 × N 层；中心首支预置 20 并可在 extract 时抽出 */
+  const lanes = [0, P.ringR, -P.ringR];
+  for (let l=0;l<P.layers;l++){
+    for (let li=0;li<lanes.length;li++){
+      const isFirst = (l===0 && li===0);
+      const base = bx + l*P.ring + (isFirst ? -P.preset : 0);
+      const shift = cartShift + (isFirst ? -extract*70 : 0);
+      const y = lanes[li];
+      const attr = isFirst
+        ? `data-part="first" data-name="首发烟支（预置露出 ${P.preset}mm）" data-spec="Ø7.8 × ${f(P.stick)}mm · 唇环咬合 1.2N"`
+        : `data-part="stick" data-name="仓内烟支" data-spec="Ø7.8 · ${f(P.stick)}mm · 7 孔 × ${P.layers} 层 = ${P.slots} 腔"`;
+      add(`<g transform="translate(${f(X(shift))} 0)" ${attr}>
+        <rect x="${f(X(base))}" y="${f(Y(y+st))}" width="${f(X(P.stick))}" height="${f((2*st)*KY)}"
+              fill="${isFirst?'#f4ecd8':'#20263a'}" stroke="${isFirst?'#d8bd74':'#4a5368'}" stroke-width="${isFirst?1:.5}"/>
+      </g>`);
+    }
+  }
+
+  /* 环带 / 端盖压在最上层 */
+  overlay(add);
+
+  /* 尺寸标注 */
+  const dim = (xa,xb,y,label,cls='')=>{
+    const a=X(xa), b=X(xb);
+    return `<g stroke="#5f7fb8" stroke-width=".5" fill="none">
+      <path d="M${f(a)} ${f(y-2)}v4M${f(b)} ${f(y-2)}v4M${f(a)} ${f(y)}H${f(b)}"/>
+    </g><text x="${f((a+b)/2)}" y="${f(y-3)}" fill="#7fa6e8" font-size="3.4" text-anchor="middle" font-family="monospace">${label}</text>`;
+  };
+
+  const dimY = 40;
+  add(dim(0, P.band, dimY, `${f(P.band)}`));
+  add(dim(P.band, bx, dimY, `${f(P.bandw)}`));
+  add(dim(bx, L, dimY, `${f(L-bx)}`));
+  add(dim(0, L, dimY+9, `总长 ${f(L)} · 比例 ${f(L/P.od)} ≈ 85/7.8`));
+
+  /* 图例 */
+  const legend = `
+    <g font-family="monospace" font-size="3.2" fill="#8b95ab">
+      <g transform="translate(${f(X(x0)+2)} -38)">
+        <rect x="0" y="-3" width="5" height="4" fill="#d8bd74" fill-opacity=".55" stroke="#d8bd74"/><text x="7" y="0.5">环撕带</text>
+        <rect x="30" y="-3" width="5" height="4" fill="#3a2f3f" stroke="#c98fd8"/><text x="37" y="0.5">面盘 + 唇环</text>
+        <rect x="76" y="-3" width="5" height="4" fill="#1d2536" stroke="#6f7f9e"/><text x="83" y="0.5">内胆</text>
+        <rect x="108" y="-3" width="5" height="4" fill="#f4ecd8" stroke="#d8bd74"/><text x="115" y="0.5">首发烟支</text>
+        <rect x="146" y="-3" width="5" height="4" fill="#20263a" stroke="#4a5368"/><text x="153" y="0.5">仓内烟支</text>
+      </g>
+    </g>`;
+
+  return `<svg viewBox="0 0 ${f(W)} ${f(H)}" xmlns="http://www.w3.org/2000/svg"
+      style="background:radial-gradient(80% 120% at 50% 40%,#161a24,#0e1118);border-radius:14px">
+      <defs>
+        <pattern id="hatch" width="3" height="3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="0" x2="0" y2="3" stroke="#2b3448" stroke-width=".7"/>
+        </pattern>
+      </defs>
+      <g transform="translate(${f(-x0)} ${f(-yTop)})">
+        ${legend}
+        ${g.join('')}
+      </g>
+    </svg>`;
+}
+
+/* ---------- 渲染 ---------- */
+const stage = document.getElementById('stage');
+const info = document.getElementById('info');
+const scrub = document.getElementById('scrub');
+const readout = document.getElementById('readout');
+const steps = [...document.querySelectorAll('#steps button')];
+
+function render(){
+  P = derive();
+  stage.innerHTML = build();
+  const peel = clamp(t/0.35,0,1), lift = clamp((t-0.36)/0.24,0,1),
+        ext = clamp((t-0.58)/0.18,0,1), mag = clamp((t-0.82)/0.18,0,1);
+  const stageName = t<0.02?'密封': peel<1?'撕带': lift<1?'拔盖': ext<1?'取烟':'弹匣';
+  readout.innerHTML = `
+    <span>阶段 <b>${stageName}</b></span>
+    <span>腔位 <b>${P.slots}</b>（${P.holes} 孔 × ${P.layers} 层）</span>
+    <span>盘 Ø<b>${f(P.plateOD,1)}</b></span>
+    <span>环 R<b>${f(P.ringR,1)}</b> / 筋 <b>${f(P.web,1)}</b></span>
+    <span>最坏间隙 <b>${f(P.gapMax)}</b>/side</span>
+    <span>伸出 <b>${f(P.preset + ext*70,1)}</b>mm</span>`;
+  document.documentElement.style.setProperty('--p', (t*100).toFixed(1)+'%');
+  steps.forEach(b=>b.classList.toggle('on', Math.abs(+b.dataset.t - t) < 0.02));
+}
+
+scrub.addEventListener('input', e=>{ t = +e.target.value/1000; render(); });
+steps.forEach(b=>b.addEventListener('click', ()=>{ t = +b.dataset.t; scrub.value = t*1000; render(); }));
+
+['od','wall','len','band'].forEach(k=>{
+  document.getElementById('p-'+k).addEventListener('input', e=>{
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v) || v<=0) return;
+    S[k] = v; render();
+  });
+});
+
+/* hover 信息 */
+stage.addEventListener('pointerover', e=>{
+  const el = e.target.closest('[data-part]');
+  if (!el) return;
+  info.innerHTML = `<b>${el.dataset.name}</b><i>${el.dataset.spec}</i>`;
+  info.classList.add('on');
+});
+stage.addEventListener('pointerout', e=>{
+  if (!e.relatedTarget || !e.relatedTarget.closest('[data-part]')) info.classList.remove('on');
+});
+
+render();
+</script>
+</body>
+</html>

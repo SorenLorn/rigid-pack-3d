@@ -1,0 +1,13 @@
+# macOS & Editor
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+
+# Dependencies & Temp
+node_modules/
+tmp/
+*.log
+
+# 生成产物（跑 npm run pack:all 重新生成）
+out/

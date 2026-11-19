@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marlboro Hard Pack · 3D 20 本入</title>
+<style>
+  :root{ --bg:#07090d; --line:#20263a; --ink:#e9edf5; --dim:#8b95ab; --gold:#d8bd74; --red:#c8102e; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:radial-gradient(120% 90% at 50% 12%,#151a26 0%,#07090d 64%);
+    color:var(--ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    display:grid; grid-template-rows:auto 1fr auto; overflow:hidden;
+  }
+  header{display:flex;align-items:center;gap:18px;padding:13px 22px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:15px;letter-spacing:.14em;font-weight:700}
+  h1 b{color:var(--gold)}
+  .meta{color:var(--dim);font-size:11.5px;letter-spacing:.08em;font-family:Consolas,monospace}
+  .hint{margin-left:auto;color:var(--dim);font-size:11.5px;letter-spacing:.05em}
+  #app{position:relative;min-height:0;cursor:grab}
+  #app.dragging{cursor:grabbing}
+  #app canvas{display:block;width:100%;height:100%}
+  #tag{
+    position:absolute;left:22px;top:16px;padding:8px 12px;border-radius:8px;
+    background:rgba(14,17,24,.85);border:1px solid var(--line);font-size:12px;
+    opacity:0;transition:.15s;pointer-events:none;backdrop-filter:blur(6px);
+  }
+  #tag.on{opacity:1}
+  #tag b{color:var(--gold);font-weight:600}
+  #tag i{font-style:normal;color:var(--dim);font-family:Consolas,monospace;font-size:11px;display:block}
+
+  #burn{
+    position:absolute;right:22px;top:16px;width:186px;padding:10px 13px;border-radius:10px;
+    background:rgba(22,14,9,.86);border:1px solid #4a3018;color:#ffb27a;
+    font:11.5px/1.4 Consolas,monospace;letter-spacing:.04em;
+    opacity:0;transform:translateY(-6px);transition:.2s;pointer-events:none;backdrop-filter:blur(6px);
+  }
+  #burn.on{opacity:1;transform:none}
+  #burn .bb{margin-top:7px;height:3px;border-radius:2px;background:#2c2118;overflow:hidden}
+  #burn .bb i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff6a1e,#ffd08a);transition:width .12s linear}
+
+  footer{border-top:1px solid var(--line);padding:12px 22px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  button.act{
+    background:#131722;border:1px solid var(--line);color:var(--ink);border-radius:999px;
+    padding:6px 15px;cursor:pointer;font:11.5px/1 inherit;letter-spacing:.08em;transition:.16s;
+  }
+  button.act:hover{border-color:var(--gold);color:var(--gold)}
+  button.act.primary{background:rgba(200,16,46,.16);border-color:#c8102e;color:#ff8fa0}
+  button.act.primary:hover{background:rgba(200,16,46,.26);color:#fff}
+  .stat{margin-left:auto;color:var(--dim);font-size:11.5px;font-family:Consolas,monospace;display:flex;gap:12px;align-items:center}
+  .stat b{color:var(--ink);font-weight:500}
+  .acts{display:none;align-items:center;gap:6px}
+  .acts.on{display:flex}
+  .acts .sep{width:1px;height:16px;background:var(--line);margin:0 4px}
+  .acts button[disabled]{opacity:.3;pointer-events:none}
+  .bar{width:120px;height:3px;border-radius:2px;background:#232a3a;overflow:hidden;display:inline-block;vertical-align:middle;margin:0 8px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#c8102e);width:0;transition:.25s}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MARLBORO <b>·</b> HARD PACK 3D</h1>
+  <span class="meta">57.0 × 24.5 × 88 · 20 本入 · 7 / 6 / 7 六方密排</span>
+  <span class="hint">点盖开合 · 拖出烟支后：拖动移位 / 右键旋转 / 双击检视 / 可点燃</span>
+  <a href="pack-3d.html" style="margin-left:14px;color:var(--gold);text-decoration:none;font-size:11.5px;border:1px solid #2a3040;border-radius:999px;padding:4px 12px;white-space:nowrap">巨管 3D →</a>
+</header>
+
+<div id="app">
+  <div id="tag"></div>
+  <div id="burn">
+    <span id="burnTxt">燃烧中 · 剩余 60.0s</span>
+    <div class="bb"><i id="burnBar"></i></div>
+  </div>
+</div>
+
+<footer>
+  <button class="act primary" id="btnLid">开盖</button>
+  <button class="act" id="btnTake">随机抽一支</button>
+  <button class="act" id="btnReset">全部放回</button>
+
+  <div class="acts" id="acts">
+    <i class="sep"></i>
+    <button class="act" id="aLight">点燃</button>
+    <button class="act" id="aAsh">弹灰</button>
+    <button class="act" id="aOut">熄灭</button>
+    <button class="act" id="aBack">放回</button>
+    <button class="act" id="aInspect">检视</button>
+    <button class="act" id="aDrop">丢弃</button>
+  </div>
+
+  <div class="stat">
+    <span>盒内 <b id="cIn">20</b></span>
+    <span>已取出 <b id="cOut">0</b></span>
+    <span>已点燃 <b id="cLit">0</b></span>
+    <span class="bar"><i id="barFill"></i></span>
+  </div>
+</footer>
+
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   尺寸（真烟盒 55 × 23 × 88，烟支 Ø7.8 × 84）
+   ============================================================ */
+/* 盒体：为了让 20 支 Ø7.8 **不压缩、不穿模**地排进去，比实物略大 1.5mm
+ * 六方密排：7 支一排跨 54.6，中排 6 支错位 3.9，排距 6.75（= 7.8·√3/2）
+ * 实体包络 54.6 × 21.3，加两侧 0.9 壁 + 0.4 间隙 → 56.6 × 24.5 */
+const W = 57.0, D = 24.5, H = 88;
+const T = 0.9;             // 盒壁厚
+const TOP_T = 2.4;         // 盒顶（翻盖顶盖）厚度：做成独立一块，才有折边的厚实感
+const LID = 24;            // 翻盖高：正好落在字标顶线上，开盖时不会把品牌名带走
+const BODY = H - LID;      // 58
+const STICK_D = 7.8, STICK_L = 84;
+const ROWS = [7, 6, 7];    // z 向三排（7/6/7 交错）
+const ROW_Z = 6.75;        // 六方排距
+
+/* ============================================================
+   渲染器 / 场景 / 相机
+   ============================================================ */
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 4000);
+
+/* 环境光贴图：程序化等距柱状渐变 */
+(function env() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 512;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 512);
+  grd.addColorStop(0, '#ffffff'); grd.addColorStop(.45, '#a8b6cf');
+  grd.addColorStop(.56, '#20263a'); grd.addColorStop(1, '#05070a');
+  g.fillStyle = grd; g.fillRect(0, 0, 1024, 512);
+  g.filter = 'blur(30px)';
+  g.fillStyle = 'rgba(255,255,255,.9)';
+  g.fillRect(120, 30, 260, 140); g.fillRect(660, 20, 200, 110);
+  g.filter = 'none';
+  const t = new THREE.CanvasTexture(c);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  scene.environment = t;
+})();
+
+const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-160, 260, 200); scene.add(key);
+const fill = new THREE.DirectionalLight(0xbdd0ff, 0.85); fill.position.set(180, 90, -170); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffe2b8, 1.2); rim.position.set(40, -80, -220); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x93a4c4, 0.5));
+
+/* 地面接触影 */
+(function ground() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(128, 128, 10, 128, 128, 126);
+  rg.addColorStop(0, 'rgba(0,0,0,.55)');
+  rg.addColorStop(.55, 'rgba(0,0,0,.18)');
+  rg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(160, 160),
+    new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = -0.05;
+  scene.add(m);
+})();
+
+/* ============================================================
+   贴图
+   ============================================================ */
+const PX = 26;                        // px / mm（原 9.2 太低，是字边发虚的根因）
+const mm = v => Math.round(v * PX);   // 取整，避免半像素糊边
+const MM = v => v * PX;               // 需要亚像素精度时用
+
+function cv(wmm, hmm) {
+  const c = document.createElement('canvas');
+  c.width = mm(wmm); c.height = mm(hmm);
+  const g = c.getContext('2d', { alpha: false });
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  if ('textRendering' in g) g.textRendering = 'geometricPrecision';
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  return { c, g, w: c.width, h: c.height };
+}
+function tex(c) {
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.generateMipmaps = true;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+/** 从整幅贴图裁出 [dTop, dBottom]（自盒顶起算，mm）的一段 */
+function crop(t, dTop, dBottom) {
+  const c = t.clone();
+  c.repeat.set(1, (dBottom - dTop) / H);
+  c.offset.set(0, 1 - dBottom / H);
+  c.needsUpdate = true;
+  return c;
+}
+
+const RED = '#c8102e';
+const GOLD = '#c9a44c';
+
+/* —— 纹章：细线银冠（原图是浅银线描，不是金色块） —— */
+function crest(g, cx, cy, r) {
+  g.save();
+  g.translate(cx, cy);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  const ink = '#b9b9b9', hi = '#e8e8e8';
+
+  /* 盾形外轮廓 */
+  g.beginPath();
+  g.moveTo(-r * .86, -r * .92);
+  g.lineTo(r * .86, -r * .92);
+  g.quadraticCurveTo(r * .92, r * .10, r * .48, r * .60);
+  g.quadraticCurveTo(r * .22, r * .92, 0, r * 1.00);
+  g.quadraticCurveTo(-r * .22, r * .92, -r * .48, r * .60);
+  g.quadraticCurveTo(-r * .92, r * .10, -r * .86, -r * .92);
+  g.closePath();
+  g.lineWidth = Math.max(1, r * .075); g.strokeStyle = ink; g.stroke();
+  g.lineWidth = Math.max(.8, r * .035); g.strokeStyle = hi; g.stroke();
+
+  /* 冠（三尖 + 底座） */
+  g.beginPath();
+  g.moveTo(-r * .58, -r * 1.00);
+  g.lineTo(-r * .30, -r * 1.30);
+  g.lineTo(0, -r * 1.04);
+  g.lineTo(r * .30, -r * 1.30);
+  g.lineTo(r * .58, -r * 1.00);
+  g.strokeStyle = ink; g.lineWidth = Math.max(1, r * .075); g.stroke();
+
+  /* 月桂：两侧弧 + 叶点 */
+  for (const s of [-1, 1]) {
+    g.beginPath();
+    g.moveTo(s * r * .78, -r * .55);
+    g.quadraticCurveTo(s * r * 1.02, r * .10, s * r * .40, r * .72);
+    g.strokeStyle = ink; g.lineWidth = Math.max(.8, r * .05); g.stroke();
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      const x = s * (r * .84 - t * r * .40);
+      const y = -r * .40 + t * r * 1.00;
+      g.beginPath();
+      g.ellipse(x, y, r * .085, r * .05, s * .6, 0, 7);
+      g.fillStyle = ink; g.fill();
+    }
+  }
+
+  /* 中央竖条 + 顶珠 */
+  g.beginPath(); g.moveTo(0, -r * .50); g.lineTo(0, r * .70);
+  g.strokeStyle = ink; g.lineWidth = Math.max(.8, r * .045); g.stroke();
+  g.beginPath(); g.arc(0, -r * .62, r * .10, 0, 7); g.fillStyle = ink; g.fill();
+
+  g.restore();
+}
+
+/* 圆角矩形（兼容无 roundRect 的实现） */
+function rr(g, x, y, w, h, r) {
+  if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, r); return; }
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+/* 正面 / 背面共用版式（back 只换警告文案，正反面各一组） */
+function faceCanvas(back = false) {
+  const { c, g, w, h } = cv(W, H);
+
+  /* 纸白 + 极淡的纸纹（不动整体干净度） */
+  g.fillStyle = '#fbfaf7'; g.fillRect(0, 0, w, h);
+
+  /* 红场 + 白色 ∧ 峰：两侧落到 37，中央峰顶 28（原图是白峰顶进红场，不是红 V） */
+  const gRed = g.createLinearGradient(0, 0, w * .25, MM(38));
+  gRed.addColorStop(0, '#d0132f');
+  gRed.addColorStop(.55, RED);
+  gRed.addColorStop(1, '#b50e28');
+  g.fillStyle = gRed;
+  g.beginPath();
+  g.moveTo(0, 0); g.lineTo(w, 0);
+  g.lineTo(w, MM(37));
+  g.lineTo(w / 2, MM(28));
+  g.lineTo(0, MM(37));
+  g.closePath(); g.fill();
+
+  /* 顶部蓝色「SELECTED TOBACCOS」徽章 */
+  const bw = 17.4, bh = 5.7, bx = (W - bw) / 2, by = 2.4;
+  rr(g, mm(bx), mm(by), mm(bw), mm(bh), MM(0.55));
+  g.fillStyle = '#3f6f8c'; g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.92)';
+  g.lineWidth = Math.max(1.4, MM(0.26)); g.stroke();
+
+  /* 徽章内小徽记：一片叶 + 两颗星 */
+  g.save();
+  g.translate(mm(bx + bw / 2), mm(by + 1.75));
+  g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, MM(0.16));
+  g.beginPath(); g.moveTo(0, MM(0.75)); g.quadraticCurveTo(MM(0.95), -MM(0.15), 0, -MM(0.95));
+  g.quadraticCurveTo(-MM(0.95), -MM(0.15), 0, MM(0.75)); g.stroke();
+  g.beginPath(); g.moveTo(0, MM(0.55)); g.lineTo(0, -MM(0.75)); g.stroke();
+  for (const s of [-1, 1]) {
+    g.beginPath(); g.arc(s * MM(1.5), -MM(0.1), MM(0.12), 0, 7);
+    g.fillStyle = '#ffffff'; g.fill();
+  }
+  g.restore();
+
+  g.fillStyle = 'rgba(255,255,255,.95)';
+  g.font = `600 ${mm(1.02)}px Helvetica, Arial, sans-serif`;
+  g.letterSpacing = `${MM(0.15)}px`;
+  g.fillText('SELECTED TOBACCOS', mm(bx + bw / 2), mm(by + bh - 0.95));
+
+  /* 大字标：横向压缩 0.62、深红、跨过白峰（原图核心特征） */
+  g.save();
+  g.translate(w / 2, MM(35.2));
+  g.scale(0.72, 1);
+  g.fillStyle = '#7d0a18';
+  g.font = `700 ${MM(15.0)}px Georgia, "Times New Roman", "Songti SC", serif`;
+  g.letterSpacing = `${MM(-0.2)}px`;
+  g.fillText('Marlboro', 0, 0);
+  g.restore();
+  g.letterSpacing = '0px';
+
+  /* 银线纹章 */
+  crest(g, w / 2, mm(45.2), mm(3.9));
+
+  /* SELECTED PREMIUM TOBACCOS */
+  g.fillStyle = '#8f8f8f';
+  g.font = `600 ${mm(1.72)}px Helvetica, Arial, sans-serif`;
+  g.letterSpacing = `${MM(0.44)}px`;
+  g.fillText('SELECTED PREMIUM TOBACCOS', w / 2, mm(52.6));
+  g.letterSpacing = '0px';
+
+  /* 分隔黑线（通栏） */
+  g.fillStyle = '#111111';
+  g.fillRect(0, MM(56.0), w, Math.max(2, MM(0.75)));
+
+  /* 警告：5 行大字，左对齐，无框（原图版式） */
+  const A = ['たばこの煙は、子供の健', '康にも悪影響を及ぼし', 'ます。たばこの誤飲を防ぐ', 'ため、乳幼児の手が届か', 'ない所に保管・廃棄を。'];
+  const B = ['たばこの煙は、あなただけ', 'でなく、周りの人の健康に', 'も悪い影響を及ぼします。', 'ニコチンには依存性があり', 'ます。'];
+
+  g.fillStyle = '#111111';
+  g.font = `700 ${mm(3.78)}px "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif`;
+  g.textAlign = 'left';
+  (back ? B : A).forEach((s, i) => {
+    g.fillText(s, mm(4.2), mm(62.4 + i * 5.32));
+  });
+  g.textAlign = 'center';
+
+  return c;
+}
+
+/* 侧面（D × 88）：红顶斜切，与正面 V 衔接 */
+function sideCanvas(right) {
+  const { c, g, w, h } = cv(D, H);
+  g.fillStyle = '#fbfaf7'; g.fillRect(0, 0, w, h);
+
+  /* 红场：与前脸左右棱线同高（37），水平收口 */
+  g.fillStyle = RED;
+  g.fillRect(0, 0, w, MM(37));
+
+  /* 竖排字标（红底白字） */
+  g.save();
+  g.translate(w / 2, MM(15.6));
+  g.rotate(-Math.PI / 2);
+  g.fillStyle = '#ffffff';
+  g.font = `700 ${mm(3.0)}px Georgia, "Times New Roman", serif`;
+  g.letterSpacing = `${MM(0.18)}px`;
+  g.fillText('Marlboro', 0, 0);
+  g.restore();
+  g.letterSpacing = '0px';
+
+  /* 白区信息 */
+  g.fillStyle = '#111111';
+  g.font = `700 ${mm(2.05)}px "Helvetica Neue", Arial, sans-serif`;
+  g.textAlign = 'left';
+  g.fillText('TAR 10 mg', mm(1.8), mm(48));
+  g.fillText('NICOTINE 0.8 mg', mm(1.8), mm(52.4));
+
+  g.font = `700 ${mm(2.9)}px "Hiragino Sans", "Yu Gothic", sans-serif`;
+  g.textAlign = 'center';
+  g.fillText('20本入', w / 2, mm(62));
+
+  /* 竖排条形码（右侧面） */
+  if (right) {
+    const bx = mm(4.2), by = mm(68), bwd = w - mm(8.4), bht = mm(9);
+    let x = bx;
+    g.fillStyle = '#111';
+    while (x < bx + bwd) {
+      const bw = Math.random() < .55 ? MM(0.28) : MM(0.55);
+      g.fillRect(x, by, Math.min(bw, bx + bwd - x), bht);
+      x += bw + MM(0.38);
+    }
+    g.font = `500 ${mm(1.5)}px Consolas, monospace`;
+    g.fillStyle = '#3d3d3d';
+    g.fillText('49 012345 678901', w / 2, by + bht + mm(2.6));
+  } else {
+    g.font = `500 ${mm(1.6)}px Consolas, monospace`;
+    g.fillStyle = '#555';
+    g.fillText('LOT 2026-S01', w / 2, mm(74));
+    g.fillText('MADE IN JAPAN', w / 2, mm(79));
+  }
+
+  g.textAlign = 'center';
+  return c;
+}
+
+/* 顶面（55 × 23）：红色 + 白 V 线 */
+function topCanvas() {
+  const { c, g, w, h } = cv(W, D);
+  const gg = g.createLinearGradient(0, 0, w, h);
+  gg.addColorStop(0, '#cf1130'); gg.addColorStop(.55, RED); gg.addColorStop(1, '#b50e28');
+  g.fillStyle = gg; g.fillRect(0, 0, w, h);
+
+  /* 与正面同源的白色 V 线，跨过顶面 */
+  g.strokeStyle = 'rgba(255,255,255,.72)';
+  g.lineWidth = MM(0.9);
+  g.lineJoin = 'miter';
+  g.beginPath();
+  g.moveTo(MM(9), h); g.lineTo(w / 2, MM(3.4)); g.lineTo(w - MM(9), h);
+  g.stroke();
+
+  g.fillStyle = 'rgba(255,255,255,.95)';
+  g.font = `700 ${mm(3.5)}px Georgia, "Times New Roman", serif`;
+  g.letterSpacing = `${MM(0.12)}px`;
+  g.fillText('Marlboro', w / 2, MM(15.2));
+  g.letterSpacing = '0px';
+  return c;
+}
+
+/* 烟支（白纸 + 软木滤嘴 27mm + 金环 + 字标） */
+function stickCanvas() {
+  const { c, g, w, h } = cv(Math.PI * STICK_D, STICK_L);
+
+  /* 卷烟纸：本白 + 纵向纤维纹 */
+  g.fillStyle = '#f9f7f2'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < w; i++) {
+    g.fillStyle = `rgba(148,138,118,${Math.random() * .05})`;
+    g.fillRect(i, 0, 1, h);
+  }
+  /* 卷纸搭接线（真烟都有一条） */
+  g.fillStyle = 'rgba(120,112,96,.10)';
+  g.fillRect(w * .82, 0, Math.max(1, MM(0.5)), h);
+
+  const fh = h * 27 / STICK_L;             // 滤嘴在 canvas 顶（= 烟支上端）
+  /* 软木纹 */
+  g.fillStyle = '#e3cba6'; g.fillRect(0, 0, w, fh);
+  for (let i = 0; i < 2600; i++) {
+    const r = Math.random() * Math.max(1.2, MM(0.35));
+    g.fillStyle = `rgba(${132 + Math.random() * 70 | 0},${98 + Math.random() * 56 | 0},${58 + Math.random() * 46 | 0},${.14 + Math.random() * .5})`;
+    g.beginPath(); g.arc(Math.random() * w, Math.random() * fh, r, 0, 7); g.fill();
+  }
+  /* 缇纸压边 + 金环 */
+  g.fillStyle = 'rgba(120,96,64,.22)';
+  g.fillRect(0, fh - Math.max(1, MM(0.35)), w, Math.max(1, MM(0.35)));
+  g.fillStyle = 'rgba(201,164,76,.95)';
+  g.fillRect(0, fh, w, Math.max(2, MM(0.55)));
+
+  /* 纸面小字标（缇纸下方一点） */
+  g.fillStyle = '#9d1020';
+  g.font = `700 ${Math.round(w * .17)}px Georgia, "Times New Roman", serif`;
+  g.fillText('Marlboro', w * .5, fh + MM(4.2));
+
+  return c;
+}
+
+const TEX = {
+  front: tex(faceCanvas(false)),
+  back: tex(faceCanvas(true)),
+  sideL: tex(sideCanvas(false)),
+  sideR: tex(sideCanvas(true)),
+  top: tex(topCanvas()),
+  stick: tex(stickCanvas()),
+};
+
+/* ============================================================
+   材质工具
+   ============================================================ */
+const mk = (map, rough = 0.55) => new THREE.MeshPhysicalMaterial({
+  map, roughness: rough, metalness: 0.02, clearcoat: 0.35, clearcoatRoughness: 0.5,
+});
+const plain = (col, rough = 0.85) => new THREE.MeshStandardMaterial({ color: col, roughness: rough });
+
+/**
+ * 一块面板：外侧用贴图，其余面白色
+ * outer: 'z+' | 'z-' | 'x+' | 'x-' | 'y+' | 'y-'
+ */
+const IDX = { 'x+': 0, 'x-': 1, 'y+': 2, 'y-': 3, 'z+': 4, 'z-': 5 };
+function panel(w, h, d, mat, outer, innerCol = 0xf4f1e8) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const white = plain(innerCol);
+  const mats = [white, white, white, white, white, white];
+  mats[IDX[outer]] = mat;
+  return new THREE.Mesh(geo, mats);
+}
+
+/* ============================================================
+   组装：盒身 + 翻盖 + 20 支
+   ============================================================ */
+const packGroup = new THREE.Group();
+scene.add(packGroup);
+
+/* 盒身（y 0…58，上开口） */
+const bodyGroup = new THREE.Group();
+packGroup.add(bodyGroup);
+{
+  /* 盒身在「自盒顶起算」的坐标里是 LID..H（不是 BODY..H）——
+     之前写成 BODY..H，等于只取了 30mm 的图拉满 58mm 面板，
+     中间 30–58 段（字标下半、纹章、副标、黑线）整段丢失 */
+  const mF = mk(crop(TEX.front, LID, H));
+  const mB = mk(crop(TEX.back, LID, H));
+  const mL = mk(crop(TEX.sideL, LID, H));
+  const mR = mk(crop(TEX.sideR, LID, H));
+
+  const front = panel(W, BODY, T, mF, 'z+');
+  front.position.set(0, BODY / 2, D / 2 - T / 2);
+  const back = panel(W, BODY, T, mB, 'z-');
+  back.position.set(0, BODY / 2, -D / 2 + T / 2);
+  const left = panel(T, BODY, D - 2 * T, mL, 'x-');
+  left.position.set(-W / 2 + T / 2, BODY / 2, 0);
+  const right = panel(T, BODY, D - 2 * T, mR, 'x+');
+  right.position.set(W / 2 - T / 2, BODY / 2, 0);
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), plain(0xf1eee4));
+  bottom.position.y = T / 2;
+
+  bodyGroup.add(front, back, left, right, bottom);
+}
+
+/* 翻盖：绕后上棱旋转，开口朝后 */
+const lidPivot = new THREE.Group();
+lidPivot.position.set(0, BODY, -D / 2);
+packGroup.add(lidPivot);
+{
+  /* 翻盖墙身只到 LID − TOP_T，顶盖单独一块盒子压在上面：
+     这样既不与墙身共面（不会 z-fighting），又得到了真实的"厚顶"折边 */
+  const wallH = LID - TOP_T;
+
+  /* 翻盖墙身：自盒顶 2.4 起，到 30 止 */
+  const mF = mk(crop(TEX.front, TOP_T, LID));
+  const mB = mk(crop(TEX.back, TOP_T, LID));
+  const mL = mk(crop(TEX.sideL, TOP_T, LID));
+  const mR = mk(crop(TEX.sideR, TOP_T, LID));
+
+  const front = panel(W, wallH, T, mF, 'z+');
+  front.position.set(0, wallH / 2, D - T / 2);
+  const back = panel(W, wallH, T, mB, 'z-');
+  back.position.set(0, wallH / 2, T / 2);
+  const left = panel(T, wallH, D - 2 * T, mL, 'x-');
+  left.position.set(-W / 2 + T / 2, wallH / 2, D / 2);
+  const right = panel(T, wallH, D - 2 * T, mR, 'x+');
+  right.position.set(W / 2 - T / 2, wallH / 2, D / 2);
+
+  /* 顶盖：六个面各自贴图，正/背/侧沿用同一版式的最后一段 */
+  const capGeo = new THREE.BoxGeometry(W, TOP_T, D);
+  const capWhite = plain(0xf4f1e8);
+  /* 顶盖：自盒顶 0 起，到 2.4 止 */
+  const capF = mk(crop(TEX.front, 0, TOP_T));
+  const capB = mk(crop(TEX.back, 0, TOP_T));
+  const capL = mk(crop(TEX.sideL, 0, TOP_T));
+  const capR = mk(crop(TEX.sideR, 0, TOP_T));
+  const capT = mk(TEX.top, 0.45);
+  const cap = new THREE.Mesh(capGeo, [capR, capL, capT, capWhite, capF, capB]);
+  cap.position.set(0, LID - TOP_T / 2, D / 2);
+
+  lidPivot.add(front, back, left, right, cap);
+}
+
+/* 20 支烟：7 / 6 / 7，三排
+   每支拆成「滤嘴 27（固定不动）+ 烟丝段 57（随燃烧缩短）」两段，
+   这样烧的时候只有白色烟丝在变短，棕色滤嘴长度保持不变 */
+const FILTER_L = 27;
+const ROD_LEN = STICK_L - FILTER_L;              // 57
+const JUNCTION = STICK_L / 2 - FILTER_L;         // 15：滤嘴/烟丝分界（局部 y）
+const sticks = [];
+
+/** 按烧掉的长度重排烟丝段：滤嘴固定 27，只有纸烟段变短 */
+function setRod(u, burn) {
+  const len = Math.max(0.5, ROD_LEN - burn);
+  u.rod.scale.y = len / ROD_LEN;
+  u.rod.position.y = JUNCTION - len / 2;
+  const endY = JUNCTION - len;                 // 燃烧端在局部坐标里的 y
+  u.rodEnd = endY;
+  u.ember.position.y = endY + 0.06;
+  u.halo.position.y = endY + 0.4;
+  if (u.ashCap) u.ashCap.position.y = endY;
+  u.len = FILTER_L + len;
+  return len;
+}
+
+function uvRange(geo, v0, v1) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setY(i, v0 + uv.getY(i) * (v1 - v0));
+  uv.needsUpdate = true;
+  return geo;
+}
+
+/* 同一张烟支贴图分两段采样：0…57/84 是纸，57/84…1 是软木 */
+const rodGeo = uvRange(
+  new THREE.CylinderGeometry(STICK_D / 2, STICK_D / 2, ROD_LEN, 28, 1, false), 0, ROD_LEN / STICK_L);
+const filterGeo = uvRange(
+  new THREE.CylinderGeometry(STICK_D / 2, STICK_D / 2, FILTER_L, 28, 1, false), ROD_LEN / STICK_L, 1);
+
+/* 状态机常量 */
+const ST = { IN: 'in', PULL: 'pull', FREE: 'free', LIT: 'lit', SPENT: 'spent', GONE: 'gone' };
+
+/* 光晕贴图：萤火 / 火苗 / 亮环 共用一张 */
+const glowTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(64, 64, 1, 64, 64, 62);
+  rg.addColorStop(0, 'rgba(255,255,236,1)');
+  rg.addColorStop(.22, 'rgba(255,196,96,.88)');
+  rg.addColorStop(.55, 'rgba(255,118,32,.30)');
+  rg.addColorStop(1, 'rgba(255,80,0,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+/* 火星点光源：全场只加一盏，避免反复增删触发着色器重编译 */
+const emberLight = new THREE.PointLight(0xff7a2a, 0, 130, 2);
+scene.add(emberLight);
+
+/* 燃烧端（局部 -Y，即滤嘴的反面） */
+const emberGeo = new THREE.CircleGeometry(STICK_D / 2 - 0.15, 24);
+
+{
+  const zs = [-ROW_Z, 0, ROW_Z];
+  ROWS.forEach((n, ri) => {
+    const span = (n - 1) * STICK_D;
+    for (let i = 0; i < n; i++) {
+      const x = -span / 2 + i * STICK_D;
+      const rodMat = mk(TEX.stick, 0.75);
+      const filterMat = mk(TEX.stick, 0.72);
+      const m = new THREE.Group();
+      m.position.set(x, STICK_L / 2 + 0.9, zs[ri]);   // 直接坐在盒底板上
+      m.rotation.y = Math.random() * Math.PI;
+
+      const rod = new THREE.Mesh(rodGeo, rodMat);
+      rod.position.y = JUNCTION - ROD_LEN / 2;        // 烟丝段：-13.5，长 57
+      const filt = new THREE.Mesh(filterGeo, filterMat);
+      filt.position.y = JUNCTION + FILTER_L / 2;      // 滤嘴：+28.5，长 27，永不缩短
+      m.add(rod, filt);
+
+      /* 火星：贴在燃烧端，未点燃时透明 */
+      const emberMat = new THREE.MeshBasicMaterial({
+        color: 0xff6a22, transparent: true, opacity: 0, depthWrite: false,
+      });
+      const ember = new THREE.Mesh(emberGeo, emberMat);
+      ember.rotation.x = Math.PI / 2;
+      ember.position.y = -STICK_L / 2 + 0.06;
+      m.add(ember);
+
+      /* 火星外发光（叠加混合，随呼吸变亮） */
+      const haloMat = new THREE.SpriteMaterial({
+        map: glowTex, color: 0xff8a3c, transparent: true, opacity: 0,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const halo = new THREE.Sprite(haloMat);
+      halo.scale.set(13, 13, 1);
+      halo.position.y = -STICK_L / 2 + 0.4;
+      m.add(halo);
+
+      /* 灰柱：燃烧时在火头堆积，弹灰时整段脱落 */
+      const capMat = new THREE.MeshStandardMaterial({
+        color: 0x9a938a, roughness: 1, metalness: 0,
+        transparent: true, opacity: 0,
+      });
+      const ashCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(STICK_D / 2 - 0.06, STICK_D / 2 - 0.35, 1, 20), capMat);
+      ashCap.position.y = -STICK_L / 2;
+      m.add(ashCap);
+
+      m.userData = {
+        home: m.position.clone(), slot: i + ri * 10,
+        state: ST.IN, out: 0, rod, rodMat, filterMat, ember, emberMat, halo, haloMat,
+        len: STICK_L, ashCap, capMat, ashLen: 0, ashAdd: 0, ashPulse: 0,
+        burn: 0, litAt: 0, puffs: null, seed: Math.random() * 10,
+      };
+      packGroup.add(m);
+      sticks.push(m);
+    }
+  });
+}
+
+/* ============================================================
+   交互
+   ============================================================ */
+const orbit = { theta: 0.34, phi: 1.18, dist: 300, tTheta: 0.34, tPhi: 1.18, tDist: 300 };
+const camGoal = new THREE.Vector3(20, 50, 0);
+const camTarget = new THREE.Vector3(20, 50, 0);
+let lidOpen = 0, lidTarget = 0;
+let drag = null;
+
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2(-2, -2);
+const el = renderer.domElement;
+
+function setPtr(e) {
+  const r = el.getBoundingClientRect();
+  ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  return { w: r.width, h: r.height };
+}
+
+/* 桌面平面（已抽出烟支的活动面） */
+const TABLE_Y = STICK_L / 2 + 0.9;
+const tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -TABLE_Y);
+const hitPt = new THREE.Vector3();
+
+function pickStick() {
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects([...sticks, lidPivot, ...bodyGroup.children], true);
+  if (!hits.length) return { stick: null, lid: false };
+  let o = hits[0].object, stick = null, lid = false;
+  while (o) {
+    if (sticks.includes(o)) { stick = o; break; }
+    if (o === lidPivot) { lid = true; break; }
+    o = o.parent;
+  }
+  return { stick, lid };
+}
+
+el.addEventListener('contextmenu', e => e.preventDefault());
+
+el.addEventListener('pointerdown', e => {
+  setPtr(e);
+  const { stick, lid } = pickStick();
+
+  /* 1) 点到盒内的烟：盖没开就先开盖 */
+  if (stick && stick.userData.state === ST.IN) {
+    if (lidOpen < 0.85) { toggleLid(); return; }
+    select(stick);
+    drag = { mode: 'pull', s: stick, y0: e.clientY };
+    app.classList.add('dragging');
+    el.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  /* 2) 点到已抽出的烟：选中 + 平移 / 旋转 */
+  if (stick) {
+    select(stick);
+    if (e.button === 2 || e.shiftKey) {
+      drag = { mode: 'spin', s: stick, x: e.clientX };
+    } else {
+      drag = { mode: 'move', s: stick, id: e.pointerId };
+      el.setPointerCapture(e.pointerId);
+    }
+    app.classList.add('dragging');
+    return;
+  }
+
+  /* 3) 点盖开合 */
+  if (lid) { toggleLid(); return; }
+
+  /* 4) 空白：取消选中 + 转场景 */
+  select(null);
+  drag = { mode: 'orbit', x: e.clientX, y: e.clientY };
+});
+
+el.addEventListener('pointermove', e => {
+  const r = setPtr(e);
+  if (!drag) { hover(); return; }
+
+  if (drag.mode === 'orbit') {
+    orbit.tTheta -= (e.clientX - drag.x) * 0.0105;
+    orbit.tPhi = Math.min(Math.PI * 0.86, Math.max(Math.PI * 0.12, orbit.tPhi - (e.clientY - drag.y) * 0.009));
+    drag.x = e.clientX; drag.y = e.clientY;
+    return;
+  }
+
+  if (drag.mode === 'pull') {
+    const worldPerPx = (2 * orbit.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / r.h;
+    const d = -(e.clientY - drag.y0) * worldPerPx;
+    drag.s.userData.out = Math.min(STICK_L * 0.92, Math.max(0, d));
+    return;
+  }
+
+  if (drag.mode === 'move') {
+    ray.setFromCamera(ptr, camera);
+    if (!ray.ray.intersectPlane(tablePlane, hitPt)) return;
+    const s = drag.s;
+    let x = hitPt.x, z = hitPt.z;
+    /* 不许推进烟盒体积里 */
+    const mx = W / 2 + 6, mz = D / 2 + 6;
+    if (Math.abs(x) < mx && Math.abs(z) < mz) {
+      if (Math.abs(x) / mx > Math.abs(z) / mz) x = Math.sign(x) * mx;
+      else z = Math.sign(z) * mz;
+    }
+    s.userData.drop = new THREE.Vector3(
+      THREE.MathUtils.clamp(x, -150, 150), TABLE_Y, THREE.MathUtils.clamp(z, -120, 140));
+    return;
+  }
+
+  if (drag.mode === 'spin') {
+    drag.s.rotation.y += (e.clientX - drag.x) * 0.014;
+    drag.x = e.clientX;
+  }
+});
+
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  app.classList.remove('dragging');
+
+  if (d.mode === 'pull') {
+    const s = d.s;
+    if (s.userData.out > 34) extract(s);
+    else { s.userData.state = ST.IN; s.userData.out = 0; }
+    return;
+  }
+
+  if (d.mode === 'move') {
+    const s = d.s;
+    /* 靠到盒口上方 → 放回 */
+    const nearMouth = Math.hypot(s.position.x, s.position.z) < W / 2 + 16 && s.userData.drop &&
+      Math.hypot(s.userData.drop.x, s.userData.drop.z) < W / 2 + 16;
+    if (nearMouth && s.userData.state !== ST.LIT) { returnToSlot(s); return; }
+    /* 拖出边界 → 丢弃 */
+    const p = s.userData.drop;
+    if (p && Math.hypot(p.x, p.z) > 132) { discard(s); return; }
+  }
+}
+el.addEventListener('pointerup', endDrag);
+el.addEventListener('pointercancel', endDrag);
+el.addEventListener('pointerleave', e => { if (drag && drag.mode === 'orbit') drag = null; });
+
+el.addEventListener('wheel', e => {
+  e.preventDefault();
+  const step = Math.min(0.22, Math.abs(e.deltaY) * 0.0016 + 0.075);   // 快速滚动时步进更大
+  orbit.tDist = Math.min(680, Math.max(110, orbit.tDist * (1 + Math.sign(e.deltaY) * step)));
+}, { passive: false });
+
+/* 槽位占用表 */
+const slots = sticks.map((s, i) => ({ pos: s.userData.home.clone(), owner: i }));
+
+/* ---------- 选中与信息条 ---------- */
+const tag = document.getElementById('tag');
+const burnEl = document.getElementById('burn');
+const burnTxt = document.getElementById('burnTxt');
+const burnBar = document.getElementById('burnBar');
+let burnOn = false;
+let hovered = null, selected = null;
+
+function select(s) {
+  selected = s;
+  document.getElementById('acts').classList.toggle('on', !!s);
+  if (s) {
+    tag.innerHTML = `<b>${stateName(s)}</b><i>Ø7.8 × ${(s.userData.len).toFixed(0)}mm · 滤嘴 27</i>`;
+    tag.classList.add('on');
+  } else if (!hovered) tag.classList.remove('on');
+  syncActs();
+}
+
+function stateName(s) {
+  const m = { in: '盒内烟支', free: '已取出', lit: '已点燃', spent: '已熄灭', gone: '' };
+  return m[s.userData.state] || '';
+}
+
+function syncActs() {
+  const st = selected ? selected.userData.state : null;
+  const on = (id, cond) => document.getElementById(id).disabled = !cond;
+  on('aLight', st === ST.FREE);
+  on('aAsh', st === ST.LIT);
+  on('aOut', st === ST.LIT);
+  on('aBack', (st === ST.FREE || st === ST.SPENT) && slots.some(x => x.owner === null));
+  on('aInspect', !!selected);
+  on('aDrop', !!selected);
+}
+
+/* 高亮：烟支现在是 Group，得遍历子网格改材质自发光 */
+function tint(s, hex) {
+  s.traverse(o => {
+    if (o.isMesh && o.material && o.material.emissive) o.material.emissive.setHex(hex);
+  });
+}
+
+function hover() {
+  const { stick } = pickStick();
+  const target = (stick && (stick.userData.state !== ST.IN || lidOpen > 0.85)) ? stick : null;
+  if (hovered !== target) {
+    if (hovered) tint(hovered, 0x000000);
+    hovered = target;
+    if (target) tint(target, 0x241f14);
+  }
+  if (target && !selected) {
+    tag.innerHTML = target.userData.state === ST.IN
+      ? '<b>滤嘴</b><i>按住向上拖，抽出一支</i>'
+      : `<b>${stateName(target)}</b><i>拖动移位 · 右键/Shift 旋转 · 双击检视</i>`;
+    tag.classList.add('on');
+  } else if (!selected) tag.classList.remove('on');
+
+  el.style.cursor = target ? 'grab' : (drag ? 'grabbing' : 'default');
+}
+
+/* ---------- 计数 ---------- */
+function updateHUD() {
+  let inP = 0, out = 0, lit = 0;
+  for (const s of sticks) {
+    const st = s.userData.state;
+    if (st === ST.IN) inP++;
+    else if (st === ST.FREE || st === ST.LIT || st === ST.SPENT) { out++; if (st === ST.LIT) lit++; }
+  }
+  document.getElementById('cIn').textContent = inP;
+  document.getElementById('cOut').textContent = out;
+  document.getElementById('cLit').textContent = lit;
+  document.getElementById('barFill').style.width = (out / 20 * 100) + '%';
+  syncActs();
+}
+
+/* ---------- 抽出 ---------- */
+let taken = 0;
+function showTarget(n) {
+  const col = n % 5, row = Math.floor(n / 5);
+  return new THREE.Vector3(46 + col * 13, TABLE_Y, -8 + row * 16);
+}
+
+function extract(s) {
+  const u = s.userData;
+  u.state = ST.FREE;
+  u.out = STICK_L * 0.92;
+  u.show = taken++;
+  u.drop = showTarget(u.show);
+  if (slots[u.slot]) slots[u.slot].owner = null;   // 腾出槽位
+  updateHUD();
+}
+
+/* ---------- 放回 ---------- */
+function returnToSlot(s) {
+  const u = s.userData;
+  let best = null, bd = Infinity;
+  slots.forEach((sl, i) => {
+    if (sl.owner !== null) return;
+    const d = sl.pos.distanceTo(s.position);
+    if (d < bd) { bd = d; best = i; }
+  });
+  if (best === null) return;
+  slots[best].owner = sticks.indexOf(s);
+  u.slot = best;
+  u.home = slots[best].pos.clone();
+  u.state = ST.IN;
+  u.out = 0;
+  u.drop = null;
+  u.puffOn = false;
+  u.ashLen = 0;
+  u.ashAdd = 0;
+  u.burn = 0;
+  u.len = STICK_L;
+  setRod(u, 0);                        // 放回时烟丝段恢复全长（滤嘴本来就是全长）
+  if (u.capMat) u.capMat.opacity = 0;
+  if (u.haloMat) u.haloMat.opacity = 0;
+  if (u.puffs) u.puffs.forEach(p => p.material.opacity = 0);
+  if (lidTarget < 0.5) toggleLid();
+  updateHUD();
+}
+
+/* ---------- 点燃 / 弹灰 / 熄灭 ---------- */
+const puffTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(32, 32, 1, 32, 32, 30);
+  rg.addColorStop(0, 'rgba(255,255,255,.5)');
+  rg.addColorStop(.5, 'rgba(255,255,255,.16)');
+  rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+
+/* 燃烧计时：60 秒自然烧完 52mm（84 → 32，正好剩一支烟蒂） */
+const BURN_SEC = 60;
+const BURN_MM = 52;
+const BURN_RATE = BURN_MM / BURN_SEC;     // mm/s
+
+/* 火花 / 灰烬粒子池 */
+const sparks = [];          // { sp, v, life, max, grav, grow, spin }
+
+function spawnSpark(pos, opt = {}) {
+  const col = opt.color ?? 0xffa14a;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: col, transparent: true, opacity: opt.opacity ?? 1,
+    depthWrite: false, blending: opt.additive === false ? THREE.NormalBlending : THREE.AdditiveBlending,
+  }));
+  const s0 = opt.size ?? 2.2;
+  sp.scale.set(s0, s0, 1);
+  sp.position.copy(pos);
+  scene.add(sp);
+  const a = Math.random() * Math.PI * 2;
+  const r = (opt.spread ?? 18) * Math.random();
+  sparks.push({
+    sp,
+    v: new THREE.Vector3(Math.cos(a) * r, (opt.up ?? 26) * (0.35 + Math.random()), Math.sin(a) * r),
+    life: 0, max: opt.max ?? 0.7,
+    grav: opt.grav ?? 42, grow: opt.grow ?? 1.6, additive: opt.additive !== false,
+  });
+}
+
+/** 点燃特效：白闪 + 火星四溅 + 火苗窜起 */
+function igniteFX(s) {
+  const u = s.userData;
+  const top = s.position.clone().add(new THREE.Vector3(0, STICK_L / 2, 0));
+  u.litAt = performance.now() / 1000;
+
+  /* 中央火苗：先窜大再收 */
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0xffb04a, transparent: true, opacity: 1,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  flame.position.copy(top);
+  flame.scale.set(4, 4, 1);
+  scene.add(flame);
+  sparks.push({ sp: flame, v: new THREE.Vector3(0, 6, 0), life: 0, max: 0.5, grav: -6, grow: 9, additive: true });
+
+  /* 火星四溅 */
+  for (let i = 0; i < 26; i++) {
+    spawnSpark(top, {
+      color: i % 3 ? 0xffa33c : 0xfff0c0,
+      size: 1.2 + Math.random() * 2.4,
+      spread: 30, up: 46, max: 0.55 + Math.random() * 0.5, grav: 70, grow: 0.9,
+    });
+  }
+  /* 一圈外扩亮环 */
+  const ring = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0xff8a3a, transparent: true, opacity: .9,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  ring.position.copy(top);
+  scene.add(ring);
+  sparks.push({ sp: ring, v: new THREE.Vector3(0, 0, 0), life: 0, max: 0.42, grav: 0, grow: 26, additive: true });
+}
+
+function light(s) {
+  const u = s.userData;
+  if (u.state !== ST.FREE) return;
+  u.state = ST.LIT;
+  u.litAt = performance.now() / 1000;
+  u.burn = 0;
+  u.ashAdd = 0;
+  u.left = BURN_SEC;
+  u.puffOn = true;
+  if (!u.puffs) {
+    u.puffs = [];
+    for (let i = 0; i < 8; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: puffTex, transparent: true, opacity: 0, depthWrite: false,
+      }));
+      sp.scale.set(8, 8, 1);
+      scene.add(sp);
+      u.puffs.push(sp);
+    }
+  }
+  igniteFX(s);
+  updateHUD();
+  select(s);
+}
+
+function ash(s) {
+  const u = s.userData;
+  if (u.state !== ST.LIT) return;
+
+  const top = s.position.clone().add(new THREE.Vector3(0, STICK_L / 2 - u.burn, 0));
+
+  /* 抖掉的灰 = 这段时间堆起来的灰柱（至少 2.0mm，保证肉眼可见的缩短） */
+  const drop = Math.max(2.0, u.ashLen * 1.15);
+  u.ashLen = 0;
+  u.ashAdd = Math.min(BURN_MM, (u.ashAdd ?? 0) + drop);
+  u.ashPulse = performance.now() / 1000;
+
+  /* 灰烬团：数量随灰柱长度增加，尺寸也跟着放大 */
+  const n = 20 + Math.round(drop * 6);
+  const tints = [0x6f6a63, 0x8b857b, 0x4f4b45, 0xa39c90, 0x5b564f];
+  for (let i = 0; i < n; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: puffTex, color: tints[i % tints.length], transparent: true, opacity: .95,
+      depthWrite: false,
+    }));
+    const sz = (1.8 + Math.random() * 3.6) * (0.8 + drop * 0.22);
+    sp.scale.set(sz, sz, 1);
+    sp.position.copy(top).add(new THREE.Vector3(
+      (Math.random() - .5) * 4, Math.random() * 2.4, (Math.random() - .5) * 4));
+    scene.add(sp);
+    const a = Math.random() * Math.PI * 2;
+    const r = 8 + Math.random() * 30;
+    sparks.push({
+      sp,
+      v: new THREE.Vector3(Math.cos(a) * r, (4 + Math.random() * 26), Math.sin(a) * r),
+      life: 0, max: 0.8 + Math.random() * 0.8, grav: 165, grow: 0.7, additive: false,
+    });
+  }
+  /* 崩出的火星 + 一小股扬尘 */
+  for (let i = 0; i < 8; i++) {
+    spawnSpark(top, { size: 1.2 + Math.random() * 1.4, spread: 20, up: 34, max: 0.4, grav: 70, grow: 0.7 });
+  }
+  for (let i = 0; i < 3; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: puffTex, color: 0xbfb9ae, transparent: true, opacity: .35, depthWrite: false,
+    }));
+    sp.scale.set(6, 6, 1);
+    sp.position.copy(top).add(new THREE.Vector3(
+      (Math.random() - .5) * 5, Math.random() * 3, (Math.random() - .5) * 5));
+    scene.add(sp);
+    sparks.push({ sp, v: new THREE.Vector3((Math.random() - .5) * 6, 10 + Math.random() * 8,
+      (Math.random() - .5) * 6), life: 0, max: 1.4, grav: -16, grow: 5.5, additive: false });
+  }
+}
+
+function extinguish(s) {
+  const u = s.userData;
+  if (u.state !== ST.LIT) return;
+  u.state = ST.SPENT;
+  u.puffOn = false;
+  u.emberMat.opacity = 0;
+  if (u.haloMat) u.haloMat.opacity = 0;
+  if (u.puffs) u.puffs.forEach(p => p.material.opacity = 0);
+  if (u.capMat) { u.capMat.color.setHex(0x4a463f); u.capMat.opacity = 0.85; }   // 烟蒂断面留焦黑灰口
+  emberLight.intensity = 0;
+  /* 熄灭的一小股青烟 */
+  const top = s.position.clone().add(new THREE.Vector3(0, STICK_L / 2 - u.burn, 0));
+  for (let i = 0; i < 8; i++) {
+    spawnSpark(top, {
+      color: 0x9aa0a8, additive: false, size: 2.6, spread: 10, up: 16,
+      max: 0.9, grav: -14, grow: 3.2, opacity: 0.5,
+    });
+  }
+  updateHUD();
+  select(s);
+}
+
+function discard(s) {
+  s.userData.state = ST.GONE;
+  s.userData.puffOn = false;
+  if (s.userData.emberMat) s.userData.emberMat.opacity = 0;
+  updateHUD();
+  select(null);
+}
+
+/* ---------- 检视 ---------- */
+let focusStick = null;
+function inspect(s) {
+  focusStick = s;
+  camGoal.set(s.position.x, s.position.y, s.position.z);
+  orbit.tDist = 120;
+}
+function unfocus() {
+  focusStick = null;
+  camGoal.set(20, 50, 0);
+  orbit.tDist = 300;
+}
+
+function toggleLid() {
+  lidTarget = lidTarget > 0.5 ? 0 : 1;
+  document.getElementById('btnLid').textContent = lidTarget > 0.5 ? '合盖' : '开盖';
+}
+
+/* ---------- 键盘 ---------- */
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { unfocus(); select(null); }
+  if (e.key === 'Delete' && selected) discard(selected);
+  if (e.key === ' ' && selected) { e.preventDefault(); inspect(selected); }
+});
+el.addEventListener('dblclick', () => { if (selected) inspect(selected); });
+
+/* ============================================================
+   按钮
+   ============================================================ */
+document.getElementById('btnLid').onclick = toggleLid;
+
+document.getElementById('btnTake').onclick = () => {
+  if (lidTarget < 0.5) toggleLid();
+  const cand = sticks.filter(s => s.userData.state === ST.IN);
+  if (!cand.length) return;
+  const pick = cand[Math.floor(Math.random() * cand.length)];
+  setTimeout(() => extract(pick), 420);
+};
+
+document.getElementById('btnReset').onclick = () => {
+  sticks.forEach(s => {
+    const u = s.userData;
+    if (u.state === ST.LIT) return;                 // 点燃的放不回去
+    if (u.state === ST.GONE) { u.state = ST.IN; s.visible = true; s.scale.setScalar(1); }
+    if (u.state === ST.FREE || u.state === ST.SPENT || u.state === ST.IN) {
+      if (!slots.some(x => x.owner === sticks.indexOf(s))) returnToSlot(s);
+    }
+  });
+  unfocus(); select(null); updateHUD();
+};
+
+document.getElementById('aLight').onclick = () => selected && light(selected);
+document.getElementById('aAsh').onclick = () => selected && ash(selected);
+document.getElementById('aOut').onclick = () => selected && extinguish(selected);
+document.getElementById('aBack').onclick = () => selected && returnToSlot(selected);
+document.getElementById('aInspect').onclick = () => selected && inspect(selected);
+document.getElementById('aDrop').onclick = () => selected && discard(selected);
+
+/* ============================================================
+   循环
+   ============================================================ */
+function resize() {
+  const w = app.clientWidth, h = app.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock();
+
+function tick() {
+  const dt = Math.min(0.05, clock.getDelta());
+  const now = performance.now() / 1000;
+  const L = THREE.MathUtils.lerp;
+
+  /* 盖子 */
+  lidOpen += (lidTarget - lidOpen) * Math.min(1, dt * 7);
+  lidPivot.rotation.x = -lidOpen * THREE.MathUtils.degToRad(104);
+
+  /* 烟支 */
+  for (const s of sticks) {
+    const u = s.userData;
+
+    if (u.state === ST.GONE) {
+      s.scale.multiplyScalar(1 - Math.min(1, dt * 6));
+      if (s.scale.x < 0.05) s.visible = false;
+      continue;
+    }
+    if (!s.visible) { s.visible = true; s.scale.setScalar(1); }
+
+    /* 拖拽中：跟手，不插值 */
+    if (drag && drag.s === s && drag.mode === 'pull') {
+      s.position.y = u.home.y + u.out;
+      s.rotation.z = L(s.rotation.z, -0.04, 0.2);
+      continue;
+    }
+    if (drag && drag.s === s && drag.mode === 'move') {
+      /* 横向跟手：高速插值保证响应，速度差转成倾角做出"甩"的惯性感 */
+      const prevX = s.position.x;
+      const kf = 1 - Math.exp(-40 * dt);
+      s.position.x += (u.drop.x - s.position.x) * kf;
+      s.position.z += (u.drop.z - s.position.z) * kf;
+      s.position.y = 0.9 + (STICK_L / 2 - u.burn);
+      const vx = (s.position.x - prevX) / Math.max(dt, 1e-3);
+      u.lean = THREE.MathUtils.clamp(-vx * 0.011, -0.55, 0.55);
+      s.rotation.z = L(s.rotation.z, u.lean, 1 - Math.exp(-20 * dt));
+      continue;
+    }
+
+    if (u.state === ST.IN) {
+      s.position.lerp(u.home, Math.min(1, dt * 9));
+      s.rotation.x = L(s.rotation.x, 0, Math.min(1, dt * 8));
+      s.rotation.z = L(s.rotation.z, 0, Math.min(1, dt * 8));
+      if (u.burn > 0.01) { u.burn = L(u.burn, 0, Math.min(1, dt * 8)); setRod(u, u.burn); }
+      u.emberMat.opacity *= 0.86;
+      continue;
+    }
+
+    if (u.state === ST.FREE || u.state === ST.SPENT) {
+      if (u.drop) {
+        s.position.lerp(u.drop, Math.min(1, dt * 4));
+        /* 烟蒂按当前实际长度贴地 */
+        s.position.y = 0.9 + (STICK_L / 2 - u.burn);
+      }
+      s.rotation.x = L(s.rotation.x, 0, Math.min(1, dt * 4));
+      s.rotation.z = L(s.rotation.z, 0, Math.min(1, dt * 4));
+      if (u.state === ST.FREE) { u.burn = L(u.burn, 0, Math.min(1, dt * 6)); }
+      setRod(u, u.burn);
+      if (u.state === ST.SPENT) u.emberMat.opacity = L(u.emberMat.opacity, 0, Math.min(1, dt * 3));
+      u.puffOn = false;
+      continue;
+    }
+
+    if (u.state === ST.LIT) {
+      /* 翻过来：滤嘴朝下、火头朝上 */
+      s.rotation.x = L(s.rotation.x, Math.PI, Math.min(1, dt * 4));
+      s.rotation.z = L(s.rotation.z, 0, Math.min(1, dt * 4));
+
+      /* 燃烧量 = 时间进度 + 弹灰加速；剩余时间由燃烧量反算 */
+      const el = now - u.litAt;
+      u.burn = Math.min(BURN_MM, el * BURN_RATE + (u.ashAdd ?? 0));
+      u.left = Math.max(0, (BURN_MM - u.burn) / BURN_MM * BURN_SEC);
+      setRod(u, u.burn);
+      s.position.y = TABLE_Y;                     // 滤嘴始终贴地，不再随长度下移
+
+      /* 灰柱随时间堆积（挂在燃烧端） */
+      if (!u.ashHold) u.ashLen = Math.min(3.6, u.ashLen + dt * 0.9);
+      if (u.ashCap) {
+        const a = u.ashLen;
+        u.capMat.opacity = Math.min(1, a / 0.5) * 0.96;
+        u.ashCap.scale.set(1, Math.max(0.001, a), 1);
+        u.ashCap.position.y = u.rodEnd + a / 2;   // 灰柱从燃烧端往烟身方向堆
+      }
+
+      /* 后期亮度衰减（越接近烧完越暗，最后 5 秒掉得明显） */
+      const decay = 0.35 + 0.65 * Math.min(1, u.left / (BURN_SEC * 0.55));
+      const flick = (0.74 + 0.26 * Math.sin(now * 7 + u.seed * 3)
+        + 0.14 * Math.sin(now * 23 + u.seed * 7)) * decay;
+      u.emberMat.opacity = flick;
+      u.emberMat.color.setRGB(1, 0.30 + 0.22 * flick, 0.05);
+
+      /* 外发光：弹灰后 0.45s 内暴涨 */
+      const pulse = u.ashPulse ? Math.max(0, 1 - (now - u.ashPulse) / 0.45) : 0;
+      u.haloMat.opacity = Math.min(1, flick * 0.9 + pulse);
+      const hs = 13 + flick * 6 + pulse * 26;
+      u.halo.scale.set(hs, hs, 1);
+
+      /* 火星点光源跟随（翻转后燃烧端在局部 -Y，世界坐标要加回去） */
+      const topY = s.position.y + (STICK_L / 2 - u.burn);
+      emberLight.position.set(s.position.x, topY, s.position.z);
+      emberLight.intensity = (2.4 + pulse * 7) * decay;
+      emberLight.distance = 130;
+
+      /* 白烟：更浓、更多层，带湍流摆动与"吞吐"节奏 */
+      if (u.puffs) {
+        const puffCycle = 0.62 + 0.38 * Math.sin(now * 0.9 + u.seed);   // 吞吐呼吸
+        u.puffs.forEach((sp, i) => {
+          const off = i / u.puffs.length;
+          const age = ((now * 0.42 + off + u.seed * 0.17) % 1);
+          const wob = Math.sin(age * 7 + u.seed + i) * (1.5 + age * 7);
+          sp.position.set(
+            s.position.x + wob + age * 5,
+            topY + age * 62,
+            s.position.z + Math.cos(age * 5 + u.seed + i * 1.7) * (1.5 + age * 7));
+          const sc = (5 + i * 1.6) + age * (22 + i * 2);
+          sp.scale.set(sc, sc, 1);
+          const fade = Math.sin(Math.min(1, age) * Math.PI) * (1 - age * 0.35);
+          sp.material.opacity = u.puffOn ? Math.min(0.62, fade * 0.55 * puffCycle) : 0;
+        });
+      }
+
+      /* 烧完 → 自动熄灭 */
+      if (u.left <= 0) {
+        u.burnOut = true;
+        extinguish(s);
+      }
+    }
+  }
+
+  /* 熄灭后熄灯 */
+  if (!sticks.some(s => s.userData.state === ST.LIT)) {
+    emberLight.intensity *= 0.82;
+  }
+
+  /* 火花 / 灰烬粒子（统一池） */
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const b = sparks[i];
+    b.life += dt;
+    const t = b.life / b.max;
+    b.v.y -= b.grav * dt;
+    b.sp.position.addScaledVector(b.v, dt);
+    const sc = b.sp.scale.x + b.grow * dt;
+    b.sp.scale.set(sc, sc, 1);
+    b.sp.material.opacity = Math.max(0, 1 - t) * (b.additive ? 1 : 0.9);
+    if (t >= 1 || b.sp.position.y < -1) {
+      scene.remove(b.sp);
+      b.sp.material.dispose();
+      sparks.splice(i, 1);
+    }
+  }
+
+  /* 燃烧计时牌 */
+  const litS = sticks.find(s => s.userData.state === ST.LIT);
+  if (litS) {
+    const left = litS.userData.left ?? BURN_SEC;
+    burnEl.classList.add('on');
+    burnTxt.textContent = `燃烧中 · 剩余 ${left.toFixed(1)}s`;
+    burnBar.style.width = (left / BURN_SEC * 100).toFixed(1) + '%';
+    burnOn = true;
+  } else if (burnOn) {
+    burnEl.classList.remove('on');
+    burnOn = false;
+  }
+
+  /* 相机：全部按 dt 归一的指数插值，帧率变化时手感一致；转速/缩放都比之前更快 */
+  camTarget.lerp(camGoal, 1 - Math.exp(-8 * dt));
+  orbit.theta += (orbit.tTheta - orbit.theta) * (1 - Math.exp(-19 * dt));
+  orbit.phi += (orbit.tPhi - orbit.phi) * (1 - Math.exp(-19 * dt));
+  orbit.dist += (orbit.tDist - orbit.dist) * (1 - Math.exp(-15 * dt));
+  const sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
+  camera.position.set(
+    camTarget.x + orbit.dist * sp * Math.sin(orbit.theta),
+    camTarget.y + orbit.dist * cp,
+    camTarget.z + orbit.dist * sp * Math.cos(orbit.theta)
+  );
+  camera.lookAt(camTarget);
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+updateHUD();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
