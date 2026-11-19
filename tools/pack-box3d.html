@@ -154,7 +154,7 @@ const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 4000);
 })();
 
 const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-160, 260, 200); scene.add(key);
-const fill = new THREE.DirectionalLight(0xbdd0ff, 0.85); fill.position.set(180, 90, -170); scene.add(fill);
+const fill = new THREE.DirectionalLight(0xbdd0ff, 0.42); fill.position.set(180, 90, -170); scene.add(fill);
 const rim = new THREE.DirectionalLight(0xffe2b8, 1.2); rim.position.set(40, -80, -220); scene.add(rim);
 scene.add(new THREE.AmbientLight(0x93a4c4, 0.5));
 
@@ -223,7 +223,7 @@ function crest(g, cx, cy, r) {
   g.translate(cx, cy);
   g.lineCap = 'round';
   g.lineJoin = 'round';
-  const ink = '#b9b9b9', hi = '#e8e8e8';
+  const ink = '#a3a3a3', hi = '#dcdcdc';
 
   /* 盾形外轮廓 */
   g.beginPath();
@@ -327,8 +327,10 @@ function faceCanvas(back = false) {
   g.letterSpacing = `${MM(0.15)}px`;
   g.fillText('SELECTED TOBACCOS', mm(bx + bw / 2), mm(by + bh - 0.95));
 
-  /* 大字标：横向压缩 0.62、深红、跨过白峰（原图核心特征） */
+  /* 大字标：横向压缩 0.72、深红、跨过白峰（原图核心特征）
+     注意：cv() 默认 textBaseline 为 middle，这里要按字母底边定位，必须切回 alphabetic */
   g.save();
+  g.textBaseline = 'alphabetic';
   g.translate(w / 2, MM(35.2));
   g.scale(0.72, 1);
   g.fillStyle = '#7d0a18';
@@ -493,8 +495,11 @@ const TEX = {
 /* ============================================================
    材质工具
    ============================================================ */
-const mk = (map, rough = 0.55) => new THREE.MeshPhysicalMaterial({
-  map, roughness: rough, metalness: 0.02, clearcoat: 0.35, clearcoatRoughness: 0.5,
+const mk = (map, rough = 0.72) => new THREE.MeshPhysicalMaterial({
+  map, roughness: rough, metalness: 0.02,
+  /* 卡纸正面朝光时本来就很哑：高光压低、环境反射减半。
+     否则两侧面接近掠射角时菲涅尔反光会把整块红色洗成米白。 */
+  clearcoat: 0.05, clearcoatRoughness: 0.5, envMapIntensity: 0.32,
 });
 const plain = (col, rough = 0.85) => new THREE.MeshStandardMaterial({ color: col, roughness: rough });
 
